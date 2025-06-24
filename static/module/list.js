@@ -63,21 +63,42 @@ export class List {
         const li = document.createElement('li');
         li.appendChild((new Card(pkg)).render());
         this.getTarget().appendChild(li);
-      })
+      });
       rendered += next.length;
 
       if (rendered >= total) {
         // stop observing
-        this.observer.unobserve(this.observed);
+        this.observer.disconnect();
       }
+    };
+
+    const isFooterVisibleEnough = () => {
+      const rect = this.observed.getBoundingClientRect();
+      const height = rect.height || 1;
+      const visibleTop = Math.max(rect.top, 0);
+      const visibleBottom = Math.min(rect.bottom, window.innerHeight);
+      const visibleHeight = Math.max(visibleBottom - visibleTop, 0);
+      const visibleRatio = visibleHeight / height;
+      return visibleRatio >= 0.2;
+    };
+
+    // Render until the footer is pushed below visibility threshold
+    while (rendered < total && isFooterVisibleEnough()) {
+      renderBatch();
     }
 
-    // start observing scroll: footer comes into viewport
-    this.observer = new IntersectionObserver(renderBatch, {
+    // Set up observer for future scroll-triggered batches
+    this.observer = new IntersectionObserver((entries) => {
+      if (entries.some(entry => entry.intersectionRatio >= 0.2)) {
+        renderBatch();
+      }
+    }, {
       root: null,
       threshold: 0.2,
     });
 
-    this.observer.observe(this.observed);
+    if (rendered < total) {
+      this.observer.observe(this.observed);
+    }
   }
 }
